@@ -20,6 +20,15 @@ A native Apple silicon macOS study Bible reader built on the public NET Bible AP
 - **Offline cache** — every passage you read is cached to disk, so recent readings
   still open without a connection.
 
+
+
+
+
+
+## COMING SOON!!!
+**Official study notes from the NET API**
+
+
 ## Install
 
 The built app is at `build/NET Study.app`. Copy it wherever you like:
