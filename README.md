@@ -75,3 +75,5 @@ is sent anywhere except the passage reference itself to `labs.bible.org`.
 Scripture text is the **New English Translation (NET Bible)**, © Biblical Studies
 Press, served through the public NET Bible API at `labs.bible.org`. This app is an
 unofficial reader and is not affiliated with Bible.org.
+
+The GPL-3.0 license was specifically chosen to keep anyone from using the free-to-use and copyrighted NET Bible for illegal commercial gain.
