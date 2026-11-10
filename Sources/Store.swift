@@ -24,6 +24,14 @@ final class AppStore: ObservableObject {
     @Published var votd: [Verse] = []
     @Published var votdLoading = false
 
+    // Cached keyword search
+    @Published var cachedMatches: [Verse] = []
+    @Published var cachedPassageCount = 0
+    @Published var cachedMatchesTruncated = false
+    @Published var isSearchingCache = false
+    /// Set after a search result is opened so the reader can scroll to it.
+    @Published var pendingScrollVerseID: String?
+
     @Published var highlights: [String: Int] {
         didSet { scheduleSave() }
     }
@@ -172,6 +180,58 @@ final class AppStore: ObservableObject {
     func openVerse(_ verse: Verse) {
         let ref = Reference.parse("\(verse.bookname) \(verse.chapter):\(verse.verse)")
         if let ref { Task { await load(.reference(ref)) } }
+    }
+
+    // MARK: - Cached keyword search
+
+    private var searchTask: Task<Void, Never>?
+
+    /// Searches the on-disk passage cache. Debounced so typing stays smooth.
+    func searchCached(_ text: String) {
+        searchTask?.cancel()
+        let term = text.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard term.count >= 2 else {
+            cachedMatches = []
+            cachedPassageCount = 0
+            cachedMatchesTruncated = false
+            isSearchingCache = false
+            return
+        }
+
+        isSearchingCache = true
+        searchTask = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: 150_000_000)
+            guard !Task.isCancelled else { return }
+            let result = await BibleAPI.shared.searchCached(term)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                guard let self else { return }
+                self.cachedMatches = result.verses
+                self.cachedPassageCount = result.passages
+                self.cachedMatchesTruncated = result.truncated
+                self.isSearchingCache = false
+            }
+        }
+    }
+
+    func clearCachedSearch() {
+        searchTask?.cancel()
+        cachedMatches = []
+        cachedPassageCount = 0
+        cachedMatchesTruncated = false
+        isSearchingCache = false
+    }
+
+    /// Opens the chapter holding a search hit, selects the verse, and asks the
+    /// reader to scroll to it.
+    func openSearchMatch(_ verse: Verse) async {
+        guard let book = Bible.book(named: verse.bookname) else { return }
+        let chapter = min(max(verse.chapterNumber, 1), book.chapters)
+        let ref = Reference(book: book, chapter: chapter)
+        await load(.reference(ref))
+        selectedVerseID = verse.id
+        pendingScrollVerseID = verse.id
     }
 
     func shuffleVerse() {

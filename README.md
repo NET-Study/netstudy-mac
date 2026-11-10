@@ -19,6 +19,10 @@ A native Apple silicon macOS study Bible reader built on the public NET Bible AP
 - **Verse of the Day and random passages** for when you don't know where to land.
 - **Offline cache** — every passage you read is cached to disk, so recent readings
   still open without a connection.
+- **Keyword search over the cache** — type a word or phrase in the search field and
+  it searches every passage you've already opened (all words must match, case- and
+  accent-insensitive). Arrow keys move through results, Return opens the verse and
+  scrolls to it. Nothing is sent to the network for this.
 
 
 

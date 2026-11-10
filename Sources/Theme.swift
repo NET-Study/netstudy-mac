@@ -32,6 +32,12 @@ enum Theme {
         scheme == .dark ? Color.white.opacity(0.055) : Color.white.opacity(0.55)
     }
 
+    /// Solid surface for floating panels (dropdowns, popovers) so text behind
+    /// them doesn't bleed through.
+    static func panel(_ scheme: ColorScheme) -> Color {
+        scheme == .dark ? Color(hex: 0x1B181F) : Color(hex: 0xFDFAF5)
+    }
+
     static func stroke(_ scheme: ColorScheme) -> Color {
         scheme == .dark ? Color.white.opacity(0.09) : Color.black.opacity(0.075)
     }

@@ -137,4 +137,60 @@ actor BibleAPI {
         guard let data = try? Data(contentsOf: cacheFile(for: key)) else { return nil }
         return try? JSONDecoder().decode([Verse].self, from: data)
     }
+
+    // MARK: - Cached keyword search
+
+    struct CachedSearch {
+        var verses: [Verse] = []
+        var passages = 0
+        var truncated = false
+    }
+
+    private static let bookOrder: [String: Int] = Dictionary(
+        uniqueKeysWithValues: Bible.books.enumerated().map { ($0.element.name.lowercased(), $0.offset) }
+    )
+
+    /// Full-text search over passages already cached on disk.
+    /// Every whitespace-separated token must appear somewhere in the verse.
+    func searchCached(_ term: String, limit: Int = 80) -> CachedSearch {
+        let tokens = term
+            .split(whereSeparator: { $0.isWhitespace })
+            .map(String.init)
+            .filter { !$0.isEmpty }
+        guard !tokens.isEmpty else { return CachedSearch() }
+
+        let files = (try? FileManager.default.contentsOfDirectory(
+            at: cacheDirectory,
+            includingPropertiesForKeys: nil,
+            options: [.skipsHiddenFiles]
+        )) ?? []
+        let passageFiles = files.filter { $0.pathExtension.lowercased() == "json" }
+
+        let options: String.CompareOptions = [.caseInsensitive, .diacriticInsensitive]
+        var seen = Set<String>()
+        var hits: [Verse] = []
+
+        for file in passageFiles {
+            guard let data = try? Data(contentsOf: file),
+                  let verses = try? JSONDecoder().decode([Verse].self, from: data) else { continue }
+            for verse in verses where !seen.contains(verse.id) {
+                let text = verse.cleanText
+                guard tokens.allSatisfy({ text.range(of: $0, options: options) != nil }) else { continue }
+                seen.insert(verse.id)
+                hits.append(verse)
+            }
+        }
+
+        hits.sort { a, b in
+            let left = Self.bookOrder[a.bookname.lowercased()] ?? Int.max
+            let right = Self.bookOrder[b.bookname.lowercased()] ?? Int.max
+            if left != right { return left < right }
+            if a.chapterNumber != b.chapterNumber { return a.chapterNumber < b.chapterNumber }
+            return a.verseNumber < b.verseNumber
+        }
+
+        return CachedSearch(verses: Array(hits.prefix(limit)),
+                            passages: passageFiles.count,
+                            truncated: hits.count > limit)
+    }
 }

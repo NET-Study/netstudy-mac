@@ -13,6 +13,7 @@ struct ReaderView: View {
     var body: some View {
         VStack(spacing: 0) {
             ReadingHeader(showSettings: $showSettings)
+                .zIndex(30)
             Rectangle()
                 .fill(Theme.stroke(scheme))
                 .frame(height: 1)
@@ -110,6 +111,7 @@ struct ReaderView: View {
                                         store.selectedVerseID = (store.selectedVerseID == verse.id) ? nil : verse.id
                                     }
                                 }
+                                .id(verse.id)
                             }
                         }
                     }
@@ -123,6 +125,13 @@ struct ReaderView: View {
             .scrollIndicators(.never)
             .onChange(of: store.query) { _, _ in
                 proxy.scrollTo("top", anchor: .top)
+            }
+            .onChange(of: store.pendingScrollVerseID) { _, id in
+                guard let id else { return }
+                withAnimation(.easeInOut(duration: 0.38)) {
+                    proxy.scrollTo(id, anchor: .center)
+                }
+                Task { @MainActor in store.pendingScrollVerseID = nil }
             }
         }
         .overlay(alignment: .topTrailing) {
@@ -327,7 +336,10 @@ struct ReferenceSearchField: View {
 
     @State private var text = ""
     @State private var suggestions: [String] = []
+    @State private var highlighted = 0
     @FocusState private var focused: Bool
+
+    private let resultsWidth: CGFloat = 424
 
     var body: some View {
         HStack(spacing: 6) {
@@ -335,14 +347,26 @@ struct ReferenceSearchField: View {
                 .font(.system(size: 10.5, weight: .medium))
                 .foregroundStyle(Theme.secondaryText(scheme))
 
-            TextField("Go to John 3:16", text: $text)
+            TextField("Search or John 3:16", text: $text)
                 .textFieldStyle(.plain)
                 .font(.system(size: 11.5))
                 .focused($focused)
                 .onSubmit(go)
+                .onKeyPress(.downArrow) { moveSelection(1) }
+                .onKeyPress(.upArrow) { moveSelection(-1) }
+                .onKeyPress(.escape) {
+                    close()
+                    return .handled
+                }
                 .onChange(of: text) { _, newValue in
+                    highlighted = 0
                     withAnimation(.easeOut(duration: 0.15)) {
                         suggestions = ReferenceSuggestions.matches(for: newValue)
+                    }
+                    if isKeywordQuery(newValue) {
+                        store.searchCached(newValue)
+                    } else {
+                        store.clearCachedSearch()
                     }
                 }
 
@@ -350,6 +374,7 @@ struct ReferenceSearchField: View {
                 Button {
                     text = ""
                     suggestions = []
+                    store.clearCachedSearch()
                     focused = true
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -369,28 +394,23 @@ struct ReferenceSearchField: View {
                         .stroke(focused ? Theme.gold.opacity(0.55) : Theme.stroke(scheme), lineWidth: 1)
                 )
         )
-        .overlay(alignment: .topLeading) {
+        .overlay(alignment: .topTrailing) {
             if focused && !suggestions.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ForEach(suggestions, id: \.self) { name in
-                        SuggestionRow(name: name) {
-                            text = name + " "
-                            suggestions = []
-                            focused = true
+                dropdown {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(suggestions, id: \.self) { name in
+                            SuggestionRow(name: name) {
+                                text = name + " "
+                                suggestions = []
+                                focused = true
+                            }
                         }
                     }
                 }
                 .frame(width: 218)
-                .padding(.vertical, 4)
-                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8, style: .continuous)
-                        .stroke(Theme.stroke(scheme), lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.14), radius: 12, y: 6)
-                .offset(y: 32)
-                .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .top)))
-                .zIndex(20)
+            } else if focused && keywordMode {
+                dropdown { searchPanel }
+                    .frame(width: resultsWidth)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .netStudyFocusSearch)) { _ in
@@ -399,16 +419,243 @@ struct ReferenceSearchField: View {
         .onChange(of: focused) { _, isFocused in
             if !isFocused {
                 withAnimation(.easeOut(duration: 0.12)) { suggestions = [] }
+                store.clearCachedSearch()
             }
+        }
+        .onChange(of: store.cachedMatches) { _, _ in
+            highlighted = 0
         }
     }
 
+    // MARK: Dropdown chrome
+
+    private func dropdown<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .padding(.vertical, 4)
+            .background(Theme.panel(scheme), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .stroke(Theme.stroke(scheme), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(scheme == .dark ? 0.45 : 0.16), radius: 16, y: 7)
+            .offset(y: 32)
+            .transition(.opacity.combined(with: .scale(scale: 0.97, anchor: .topTrailing)))
+            .zIndex(20)
+    }
+
+    // MARK: Cached search results
+
+    private var searchPanel: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(spacing: 8) {
+                Text("CACHED PASSAGES")
+                    .font(.system(size: 8.5, weight: .semibold))
+                    .tracking(1.3)
+                    .foregroundStyle(Theme.secondaryText(scheme).opacity(0.85))
+                Spacer(minLength: 8)
+                if store.isSearchingCache {
+                    Text("searching…")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Theme.secondaryText(scheme))
+                } else if !store.cachedMatches.isEmpty {
+                    Text(store.cachedMatchesTruncated
+                         ? "many matches"
+                         : "\(store.cachedMatches.count) match\(store.cachedMatches.count == 1 ? "" : "es")")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Theme.gold)
+                }
+            }
+            .padding(.horizontal, 11)
+            .padding(.top, 7)
+            .padding(.bottom, 5)
+
+            if store.cachedMatches.isEmpty {
+                HStack(alignment: .firstTextBaseline, spacing: 7) {
+                    Image(systemName: store.isSearchingCache ? "hourglass" : "text.magnifyingglass")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Theme.secondaryText(scheme).opacity(0.7))
+                    Text(store.isSearchingCache
+                         ? "Looking through cached passages…"
+                         : "Nothing cached matches “\(trimmed)”")
+                        .font(.system(size: 10.5))
+                        .foregroundStyle(Theme.secondaryText(scheme))
+                        .lineLimit(2)
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 11)
+                .padding(.bottom, 8)
+            } else {
+                VStack(spacing: 1) {
+                    ForEach(Array(store.cachedMatches.prefix(Self.visibleRows).enumerated()),
+                            id: \.element.id) { index, verse in
+                        SearchMatchRow(
+                            verse: verse,
+                            snippet: SearchSnippet.text(for: verse, term: trimmed),
+                            highlighted: index == highlighted
+                        ) {
+                            open(verse)
+                        }
+                    }
+                }
+                .padding(.horizontal, 5)
+                .padding(.bottom, 6)
+            }
+
+            Rectangle()
+                .fill(Theme.stroke(scheme))
+                .frame(height: 1)
+
+            Text(footer)
+                .font(.system(size: 9))
+                .foregroundStyle(Theme.secondaryText(scheme).opacity(0.9))
+                .padding(.horizontal, 11)
+                .padding(.top, 5)
+                .padding(.bottom, 8)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private static let visibleRows = 6
+
+    private var footer: String {
+        if store.cachedPassageCount == 0 {
+            return "Nothing cached yet. Passages you open become searchable here."
+        }
+        let passages = "\(store.cachedPassageCount) cached passage\(store.cachedPassageCount == 1 ? "" : "s")"
+        if store.isSearchingCache { return "Searching \(passages)…" }
+        if store.cachedMatches.isEmpty { return "No match in \(passages)." }
+        if store.cachedMatches.count > Self.visibleRows {
+            return "Showing \(Self.visibleRows) of \(store.cachedMatches.count) in \(passages). Keep typing to narrow."
+        }
+        return "Found in \(passages)."
+    }
+
+    // MARK: Behaviour
+
+    private var trimmed: String {
+        text.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// True when the field should look for text rather than resolve a reference.
+    private func isKeywordQuery(_ raw: String) -> Bool {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard value.count >= 3 else { return false }
+        if Reference.parse(value) != nil { return false }
+        return ReferenceSuggestions.matches(for: value).isEmpty
+    }
+
+    private var keywordMode: Bool { isKeywordQuery(text) }
+
+    private func moveSelection(_ delta: Int) -> KeyPress.Result {
+        guard keywordMode, !store.cachedMatches.isEmpty else { return .ignored }
+        let last = min(store.cachedMatches.count, Self.visibleRows) - 1
+        highlighted = min(max(highlighted + delta, 0), last)
+        return .handled
+    }
+
     private func go() {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if keywordMode, !store.cachedMatches.isEmpty {
+            let index = min(highlighted, store.cachedMatches.count - 1)
+            open(store.cachedMatches[index])
+            return
+        }
         suggestions = []
         focused = false
+        store.clearCachedSearch()
         Task { await store.load(.userInput(trimmed)) }
+    }
+
+    private func open(_ verse: Verse) {
+        text = ""
+        suggestions = []
+        focused = false
+        store.clearCachedSearch()
+        Task { await store.openSearchMatch(verse) }
+    }
+
+    private func close() {
+        text = ""
+        suggestions = []
+        focused = false
+        store.clearCachedSearch()
+    }
+}
+
+// MARK: - Search results
+
+struct SearchMatchRow: View {
+    let verse: Verse
+    let snippet: String
+    let highlighted: Bool
+    let action: () -> Void
+
+    @Environment(\.colorScheme) private var scheme
+    @State private var hovered = false
+
+    var body: some View {
+        Button(action: action) {
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(verse.reference)
+                        .font(.system(size: 11.5, weight: .semibold, design: .serif))
+                        .foregroundStyle(highlighted ? Theme.gold : Theme.text(scheme))
+                    Spacer(minLength: 0)
+                }
+                Text(snippet)
+                    .font(.system(size: 10.5))
+                    .foregroundStyle(Theme.secondaryText(scheme))
+                    .lineLimit(2)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding(.horizontal, 7)
+            .padding(.vertical, 5)
+            .contentShape(Rectangle())
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(highlighted
+                          ? Theme.gold.opacity(scheme == .dark ? 0.16 : 0.13)
+                          : (hovered ? Color.primary.opacity(0.05) : .clear))
+            )
+        }
+        .buttonStyle(.plain)
+        .onHover { hovering in hovered = hovering }
+    }
+}
+
+enum SearchSnippet {
+    /// Text around the first match so the hit is visible without highlighting it.
+    static func text(for verse: Verse, term: String, width: Int = 170) -> String {
+        let source = verse.cleanText
+        let tokens = term.split(whereSeparator: { $0.isWhitespace }).map(String.init)
+
+        var anchor = source.startIndex
+        for token in tokens {
+            if let range = source.range(of: token, options: [.caseInsensitive, .diacriticInsensitive]) {
+                anchor = range.lowerBound
+                break
+            }
+        }
+
+        // Walk back a little, then snap to a word boundary.
+        var start = anchor
+        var steps = 0
+        while steps < 42, start > source.startIndex {
+            start = source.index(before: start)
+            steps += 1
+        }
+        if start > source.startIndex, let space = source[start...].firstIndex(of: " ") {
+            start = source.index(after: space)
+        }
+
+        let end = source.index(start, offsetBy: width, limitedBy: source.endIndex) ?? source.endIndex
+        var snippet = String(source[start..<end])
+        if start > source.startIndex { snippet = "…" + snippet }
+        if end < source.endIndex { snippet += "…" }
+        return snippet
     }
 }
 
