@@ -315,6 +315,10 @@ struct SidebarView: View {
 
     // MARK: - Footer
 
+    private static var appVersion: String {
+        (Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String) ?? "1.0"
+    }
+
     private var footer: some View {
         VStack(spacing: 0) {
             Rectangle().fill(Theme.stroke(scheme)).frame(height: 1)
@@ -328,7 +332,7 @@ struct SidebarView: View {
 
                 Spacer()
 
-                Text("v1.0")
+                Text(verbatim: "v" + Self.appVersion)
                     .font(.system(size: 9.5))
                     .foregroundStyle(Theme.secondaryText(scheme).opacity(0.7))
             }
