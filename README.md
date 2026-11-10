@@ -31,17 +31,22 @@ A native Apple silicon macOS study Bible reader built on the public NET Bible AP
 
 ## Install
 
-The built app is at `build/NET Study.app`. Copy it wherever you like:
+Download `NET-Study-1.0.0-arm64.dmg` from
+[Releases](https://github.com/occiderunt/netstudy-mac/releases/latest), open it, and
+drag **NET Study** into Applications.
+
+The app is ad-hoc signed, not notarized, so Gatekeeper blocks the first launch. Use
+**right-click → Open** once, or clear the quarantine flag:
 
 ```
-cp -R "build/NET Study.app" ~/Applications/
-open ~/Applications/"NET Study.app"
+xattr -dr com.apple.quarantine "/Applications/NET Study.app"
 ```
 
-The app is ad-hoc signed (no developer certificate). If macOS ever complains, right
-click the app and choose **Open**.
+Requires macOS 14 or later on Apple silicon (M1 or newer). There is no Intel build.
 
-Requires macOS 14 or later on Apple silicon.
+Prefer to build it yourself? `./build.sh` produces `build/NET Study.app`, and
+`cp -R "build/NET Study.app" ~/Applications/` installs it without any quarantine
+prompt, since nothing was downloaded.
 
 ## Keyboard shortcuts
 
