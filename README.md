@@ -35,7 +35,7 @@ A native Apple silicon macOS study Bible reader built on the public NET Bible AP
 
 ## Install
 
-Download `NET-Study-1.0.0-arm64.dmg` from
+Download `NET-Study-1.0.1-arm64.dmg` from
 [Releases](https://github.com/occiderunt/netstudy-mac/releases/latest), open it, and
 drag **NET Study** into Applications.
 
