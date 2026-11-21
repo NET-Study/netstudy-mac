@@ -98,4 +98,4 @@ The GPL-3.0 license was specifically chosen to keep anyone from using the free-t
 
 
 # Also listed on:
-<a href="https://macnative.io/apps/netstudy-mac?utm_source=macnative-badge&utm_medium=referral" target="_blank" rel="noopener"><img src="https://macnative.io/badge?kind=listed&theme=default&slug=netstudy-mac&rounded=1" alt="Listed on MacNative" width="212" height="58" /></a>
+<a href="https://macnative.io/apps/netstudy-mac?utm_source=macnative-badge&utm_medium=referral" target="_blank" rel="noopener"><img src="https://macnative.io/badge?kind=listed&theme=dark&slug=netstudy-mac&small=1" alt="Listed on MacNative" width="168" height="44" /></a>
