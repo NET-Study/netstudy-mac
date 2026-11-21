@@ -3,7 +3,7 @@
 A native Apple silicon macOS study Bible reader built on the public NET Bible API
 (`https://labs.bible.org/api/`). SwiftUI, no third-party dependencies, ~2.5 MB app.
 
-Also listed on:
+
 <a href="https://macnative.io/apps/netstudy-mac?utm_source=macnative-badge&utm_medium=referral" target="_blank" rel="noopener"><img src="https://macnative.io/badge?kind=listed&theme=dark&slug=netstudy-mac&small=1" alt="Listed on MacNative" width="168" height="44" /></a>
 
 ![app](docs/screenshot.png)
