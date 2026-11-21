@@ -97,5 +97,5 @@ unofficial reader and is not affiliated with Bible.org.
 The GPL-3.0 license was specifically chosen to keep anyone from using the free-to-use and copyrighted NET Bible for illegal commercial gain.
 
 
-# Listed on:
+# Also listed on:
 <a href="https://macnative.io/apps/netstudy-mac?utm_source=macnative-badge&utm_medium=referral" target="_blank" rel="noopener"><img src="https://macnative.io/badge?kind=listed&theme=default&slug=netstudy-mac&rounded=1" alt="Listed on MacNative" width="212" height="58" /></a>
